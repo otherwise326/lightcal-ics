@@ -119,6 +119,8 @@ h2, h3, p { margin-top: 0; }
 .export-heading > strong { color: var(--mint-strong); font-size: .78rem; }
 .export-section h2 { margin: 0; font-size: 1rem; }
 .export-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.export-fields > label, .export-fields input[type="date"] { min-width: 0; }
+.export-fields input[type="date"] { max-width: 100%; }
 .filename-row { margin-top: 10px; }
 .export-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 12px; }
 .export-summary > div { display: grid; gap: 3px; border-radius: 12px; padding: 10px; background: #f1f5f2; }
@@ -151,6 +153,7 @@ h2, h3, p { margin-top: 0; }
   .compact-actions { display: grid; grid-template-columns: 36px 36px 1fr 1fr; }
   .preset-form { grid-template-columns: 1fr 1fr; }
   .preset-form label:first-child { grid-column: 1 / -1; }
+  .export-fields { grid-template-columns: minmax(0, 1fr); }
   .export-summary { gap: 5px; }
   .secondary-button { width: 100%; }
   .published-card { grid-template-columns: 1fr; }

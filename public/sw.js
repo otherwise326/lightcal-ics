@@ -1,6 +1,6 @@
 const CACHE_PREFIX = 'lightcal-app-shell-';
 // Bump this revision whenever a release changes the production app shell.
-const CACHE_NAME = `${CACHE_PREFIX}g5-v1`;
+const CACHE_NAME = `${CACHE_PREFIX}g6-v1`;
 
 function scopedUrl(relativePath) {
   return new URL(relativePath, self.registration.scope).href;

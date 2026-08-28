@@ -715,8 +715,8 @@ function clearWorkspace() {
 
       <div v-if="publicationCurrent" class="published-card" aria-live="polite">
         <span class="section-label">公開連結 · {{ publicationReady ? '已就緒' : publicationCheckBusy ? '檢查中' : '待確認' }}</span>
-        <a class="public-url" :href="publishedResult.publicUrl" target="_blank" rel="noopener noreferrer">{{ publishedResult.publicUrl }}</a>
-        <a v-if="publicationReady" class="safari-button" :href="publishedResult.publicUrl" target="_blank" rel="noopener noreferrer">在 Safari 開啟並匯入</a>
+        <a class="public-url" :href="publishedResult.publicUrl">{{ publishedResult.publicUrl }}</a>
+        <a v-if="publicationReady" class="safari-button" :href="publishedResult.publicUrl">在 Safari 開啟並匯入</a>
         <button v-else class="safari-button safari-button-pending" type="button" disabled>{{ publicationCheckBusy ? '等待 GitHub Pages…' : '公開檔尚未就緒' }}</button>
         <button class="secondary-button" type="button" @click="copyPublicUrl">複製公開連結</button>
         <button v-if="publicationCheckError" class="secondary-button retry-publication-button" type="button" @click="verifyPublishedIcs">再檢查一次</button>
