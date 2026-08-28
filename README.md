@@ -12,7 +12,7 @@
 
 `/Users/vidan/Documents/Codex/2026-08-21/lightcal-html-css-vanilla-js-vue/`
 
-G0 Apple Calendar 實機 Gate、G1 純 domain／ICS 契約、G2 iPhone-first 本機排班流程、G3 離線 PWA app shell 與 G4 本機 publisher 契約皆已通過。G5 production URLs、部署狀態與剩餘實機驗證只以 Obsidian `STATUS.md` 為準。
+G0 Apple Calendar 實機 Gate、G1 純 domain／ICS 契約、G2 iPhone-first 本機排班流程、G3 離線 PWA app shell、G4 本機 publisher 契約與 G5 production deployment 皆已通過。G6 iPhone production 實測、農曆功能與剩餘實機驗證只以 Obsidian `STATUS.md` 為準。
 
 ## 本機操作
 
@@ -24,6 +24,7 @@ npm run dev
 ```
 
 - `src/domain/ics.js` 是不依賴 UI 的純 ICS generator。
+- `src/domain/lunar.js` 將指定國曆範圍內的農曆每月／每年規則投影成可檢查的國曆日期清單；清單確認後才合併進 assignment。
 - `publisher/index.js` 是不依賴 HTTP runtime 的 G4 publisher core；契約與外部邊界見 `publisher/README.md`。
 - `publisher/worker.js` 與 `publisher/github.js` 是 G5 Cloudflare Worker adapter；正式 policy 在 `wrangler.jsonc`，secrets 不得寫進 repo。
 - `npm run generate:g0` 會產生 `public/lightcal-ics-g0-three-events.ics`。

@@ -8,6 +8,7 @@ import {
   createAllDayPreset,
   createAssignment,
   createCalendarProfile,
+  mergeAssignments,
   createExportRequest,
   createReminder,
   defaultExportFilename,
@@ -59,6 +60,20 @@ test('same preset/date toggles off while different presets coexist on one date',
   assert.deepEqual(assignments.map(({ presetId, date }) => [presetId, date]), [['day', '2026-09-01'], ['night', '2026-09-01']]);
   assignments = toggleAssignment(assignments, assignment('day', '2026-09-01'));
   assert.deepEqual(assignments.map(({ presetId, date }) => [presetId, date]), [['night', '2026-09-01']]);
+});
+
+test('bulk assignment merge adds converted dates without toggling existing events off', () => {
+  const assignments = [assignment('day', '2026-09-01')];
+  const merged = mergeAssignments(assignments, [
+    assignment('day', '2026-09-01'),
+    assignment('day', '2026-09-25'),
+    assignment('night', '2026-09-25'),
+  ]);
+  assert.deepEqual(merged.map(({ presetId, date }) => [presetId, date]), [
+    ['day', '2026-09-01'],
+    ['day', '2026-09-25'],
+    ['night', '2026-09-25'],
+  ]);
 });
 
 test('assignments persist across months and inclusive export range keeps both boundaries only', () => {

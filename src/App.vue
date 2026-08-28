@@ -5,9 +5,11 @@ import {
   assignmentsForExport,
   buildScheduleExport,
   defaultExportFilename,
+  mergeAssignments,
   toggleAssignment,
   validLocalDate,
 } from './domain/schedule.js';
+import { lunarRuleLabel, projectLunarOccurrences } from './domain/lunar.js';
 import {
   addCalendarProfile,
   createInitialWorkspace,
@@ -50,6 +52,12 @@ const publishedIcs = ref('');
 const publicationReady = ref(false);
 const publicationCheckBusy = ref(false);
 const publicationCheckError = ref('');
+const lunarFrequency = ref('monthly');
+const lunarMonth = ref(1);
+const lunarDay = ref(1);
+const lunarPreview = ref([]);
+const lunarError = ref('');
+const lunarMessage = ref('');
 let publicationCheckId = 0;
 const pwaUpdateAvailable = ref(false);
 const pwaUpdateError = ref('');
@@ -126,6 +134,10 @@ const overlapRecords = computed(() => exportRangeValid.value ? overlappingExport
 }, { today }) : []);
 const publisherConfigured = computed(() => Boolean(publisherEndpoint));
 const publisherCredentialConfigured = computed(() => Boolean(publisherToken.value));
+const activePresetDates = computed(() => new Set(activeAssignments.value
+  .filter((assignment) => assignment.presetId === selectedPreset.value?.id)
+  .map((assignment) => assignment.date)));
+const lunarPendingCount = computed(() => lunarPreview.value.filter((occurrence) => !activePresetDates.value.has(occurrence.date)).length);
 const exportFingerprint = computed(() => JSON.stringify({
   profile: currentProfile.value,
   assignments: exportAssignments.value,
@@ -138,6 +150,20 @@ const publicationCurrent = computed(() => Boolean(publishedResult.value)
 
 watch(exportFingerprint, (value) => {
   if (publishedFingerprint.value && publishedFingerprint.value !== value) resetPublication();
+});
+
+watch([
+  () => workspace.value.activeCalendarProfileId,
+  () => workspace.value.draft.selectedPresetId,
+  () => workspace.value.draft.exportStartDate,
+  () => workspace.value.draft.exportEndDate,
+  lunarFrequency,
+  lunarMonth,
+  lunarDay,
+], () => {
+  lunarPreview.value = [];
+  lunarError.value = '';
+  lunarMessage.value = '';
 });
 
 onMounted(async () => {
@@ -282,6 +308,56 @@ function shiftPreset(presetId, offset) {
 function resetFilename() {
   workspace.value.draft.filename = '';
   workspace.value.draft.filenameIsCustom = false;
+}
+
+function previewLunarEvents() {
+  lunarError.value = '';
+  lunarMessage.value = '';
+  if (!selectedPreset.value) {
+    lunarError.value = '請先選擇要套用的常用項目。';
+    return;
+  }
+  try {
+    const rule = {
+      frequency: lunarFrequency.value,
+      month: lunarMonth.value,
+      day: lunarDay.value,
+    };
+    lunarPreview.value = projectLunarOccurrences({
+      ...rule,
+      startDate: workspace.value.draft.exportStartDate,
+      endDate: workspace.value.draft.exportEndDate,
+    });
+    if (!lunarPreview.value.length) {
+      lunarError.value = '這個國曆範圍內沒有符合的農曆日期。';
+      return;
+    }
+    lunarMessage.value = `${lunarRuleLabel(rule)}已換算為 ${lunarPreview.value.length} 筆國曆事件。`;
+  } catch (error) {
+    lunarPreview.value = [];
+    lunarError.value = ({
+      invalid_lunar_range: '請先設定有效的開始日與結束日。',
+      lunar_range_too_long: '單次換算範圍最多 30 年。',
+      invalid_lunar_month: '農曆月份必須是 1 到 12。',
+      invalid_lunar_day: '農曆日期必須是 1 到 30。',
+    })[error.message] ?? '農曆日期無法換算，請檢查輸入。';
+  }
+}
+
+function addLunarEvents() {
+  if (!selectedPreset.value || !lunarPreview.value.length) return;
+  const inputs = lunarPreview.value.map((occurrence) => ({
+    calendarProfileId: currentProfile.value.id,
+    presetId: selectedPreset.value.id,
+    date: occurrence.date,
+  }));
+  const before = workspace.value.assignments.length;
+  workspace.value.assignments = mergeAssignments(workspace.value.assignments, inputs);
+  const added = workspace.value.assignments.length - before;
+  lunarMessage.value = added
+    ? `已把 ${added} 筆國曆事件加入「${selectedPreset.value.title}」班表；重複日期未重複建立。`
+    : '清單內的事件都已經在班表中。';
+  resetPublication();
 }
 
 function createCurrentExport() {
@@ -685,6 +761,48 @@ function clearWorkspace() {
       <div class="export-fields">
         <label>開始日<input v-model="workspace.draft.exportStartDate" type="date"></label>
         <label>結束日<input v-model="workspace.draft.exportEndDate" type="date" :min="workspace.draft.exportStartDate"></label>
+      </div>
+      <div class="lunar-generator">
+        <div class="lunar-heading">
+          <div><span class="section-label">農曆轉國曆</span><h3>先看事件清單，再加入班表</h3></div>
+          <strong>{{ selectedPreset ? `套用：${selectedPreset.title}` : '尚未選常用項目' }}</strong>
+        </div>
+        <p>使用上方起訖日期作換算範圍；「每月」包含閏月，「每年」只採一般農曆月。</p>
+        <form class="lunar-form" @submit.prevent="previewLunarEvents">
+          <label>規則
+            <select v-model="lunarFrequency">
+              <option value="monthly">農曆每月</option>
+              <option value="yearly">農曆每年</option>
+            </select>
+          </label>
+          <label v-if="lunarFrequency === 'yearly'">農曆月
+            <select v-model.number="lunarMonth">
+              <option v-for="month in 12" :key="month" :value="month">{{ month }} 月</option>
+            </select>
+          </label>
+          <label>農曆日
+            <select v-model.number="lunarDay">
+              <option v-for="day in 30" :key="day" :value="day">{{ day }} 日</option>
+            </select>
+          </label>
+          <button class="secondary-button" type="submit" :disabled="!exportRangeValid || !selectedPreset">換算成國曆事件清單</button>
+        </form>
+        <p v-if="lunarError" class="error-message">{{ lunarError }}</p>
+        <p v-if="lunarMessage" class="success-message">{{ lunarMessage }}</p>
+        <div v-if="lunarPreview.length" class="lunar-preview">
+          <div class="settings-title-row"><h3>國曆事件清單</h3><span>{{ lunarPreview.length }} 筆</span></div>
+          <ul class="lunar-event-list">
+            <li v-for="occurrence in lunarPreview" :key="occurrence.date">
+              <time :datetime="occurrence.date">{{ occurrence.date }}</time>
+              <span>{{ occurrence.label }}</span>
+              <strong>{{ selectedPreset.title }}</strong>
+              <em v-if="activePresetDates.has(occurrence.date)">已在班表</em>
+            </li>
+          </ul>
+          <button class="primary-button lunar-add-button" type="button" :disabled="lunarPendingCount === 0" @click="addLunarEvents">
+            {{ lunarPendingCount ? `加入 ${lunarPendingCount} 筆到班表` : '已全部加入班表' }}
+          </button>
+        </div>
       </div>
       <div class="filename-row">
         <label class="grow-field">檔名<input v-model="filenameModel" maxlength="180" autocomplete="off"></label>

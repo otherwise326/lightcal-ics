@@ -14,3 +14,10 @@ test('G6 date range fields stack and allow shrinking on narrow screens', async (
   assert.match(source, /\.export-fields input\[type="date"\] \{ width: auto; max-width: none; justify-self: stretch; \}/u);
   assert.match(source, /@media \(max-width: 520px\)[\s\S]*\.export-fields \{ grid-template-columns: minmax\(0, 1fr\); \}/u);
 });
+
+test('lunar UI previews a Gregorian event list before merging assignments', async () => {
+  const source = await readFile(new URL('../src/App.vue', import.meta.url), 'utf8');
+  assert.match(source, /換算成國曆事件清單/u);
+  assert.match(source, /國曆事件清單/u);
+  assert.match(source, /mergeAssignments\(workspace\.value\.assignments, inputs\)/u);
+});

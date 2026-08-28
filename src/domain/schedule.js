@@ -102,6 +102,25 @@ export function toggleAssignment(assignments, input) {
   return [...normalized, target].sort(compareAssignments);
 }
 
+export function mergeAssignments(assignments, inputs) {
+  if (!Array.isArray(assignments) || !Array.isArray(inputs)) throw new Error('assignments_required');
+  const normalized = assignments.map(createAssignment);
+  const keys = new Set();
+  for (const assignment of normalized) {
+    const key = assignmentKey(assignment);
+    if (keys.has(key)) throw new Error('duplicate_assignment');
+    keys.add(key);
+  }
+  for (const input of inputs) {
+    const assignment = createAssignment(input);
+    const key = assignmentKey(assignment);
+    if (keys.has(key)) continue;
+    keys.add(key);
+    normalized.push(assignment);
+  }
+  return normalized.sort(compareAssignments);
+}
+
 export function createExportRequest(input) {
   requireSchemaVersion(input);
   if (!validLocalDate(input?.startDate) || !validLocalDate(input?.endDate) || input.startDate > input.endDate) throw new Error('invalid_export_range');
