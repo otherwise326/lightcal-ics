@@ -12,7 +12,7 @@
 
 `/Users/vidan/Documents/Codex/2026-08-21/lightcal-html-css-vanilla-js-vue/`
 
-G0 三事件 `.ics` 與 Apple Calendar 實機 Gate 已通過。現在的下一個切片是 G1：純 domain 與 ICS 契約。
+G0 三事件 `.ics` 與 Apple Calendar 實機 Gate 已通過。當前 Gate 與完成狀態只以 Obsidian `STATUS.md` 為準。
 
 G1 嚴格範圍：
 

@@ -99,7 +99,14 @@ function eventLines(event, generatedAt) {
   if (event.description) lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
   if (event.location) lines.push(`LOCATION:${escapeIcsText(event.location)}`);
 
-  if (event.reminderMinutesBefore !== undefined) {
+  if (event.reminderAt !== undefined && event.reminderMinutesBefore !== undefined) throw new Error('multiple_reminder_triggers');
+  if (event.reminderAt !== undefined) {
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push(`DESCRIPTION:${escapeIcsText(event.reminderDescription ?? title)}`);
+    lines.push(`TRIGGER;VALUE=DATE-TIME:${utcStamp(event.reminderAt)}`);
+    lines.push('END:VALARM');
+  } else if (event.reminderMinutesBefore !== undefined) {
     const minutes = event.reminderMinutesBefore;
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 40_320) throw new Error('invalid_reminder_minutes');
     lines.push('BEGIN:VALARM');
@@ -113,9 +120,10 @@ function eventLines(event, generatedAt) {
   return lines;
 }
 
-export function generateIcs(events, { calendarName = 'LightCal ICS', generatedAt = new Date() } = {}) {
+export function generateIcs(events, { calendarName = 'LightCal ICS', generatedAt = new Date(), productId = '-//LightCal ICS//G0//ZH-TW' } = {}) {
   if (!Array.isArray(events) || events.length === 0) throw new Error('events_required');
   const name = requiredText(calendarName, 'calendar_name_required');
+  const product = requiredIdentifier(productId, 'product_id_required');
   const ids = new Set();
   for (const event of events) {
     const id = requiredIdentifier(event?.id, 'event_id_required');
@@ -125,7 +133,7 @@ export function generateIcs(events, { calendarName = 'LightCal ICS', generatedAt
 
   const lines = [
     'BEGIN:VCALENDAR',
-    'PRODID:-//LightCal ICS//G0//ZH-TW',
+    `PRODID:${product}`,
     'VERSION:2.0',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
