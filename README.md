@@ -14,3 +14,15 @@
 
 第一個工作切片只做 G0 三事件 `.ics` 產生與實機匯入 Gate；不要搬入 Firebase、Firestore、Worker、outbox、Push、Queue 或 admin。
 
+## G0 本機操作
+
+```bash
+npm install
+npm test
+npm run build
+npm run dev
+```
+
+- `src/domain/ics.js` 是不依賴 UI 的純 ICS generator。
+- `npm run generate:g0` 會產生 `public/lightcal-ics-g0-three-events.ics`。
+- 測試檔只應匯入專用測試 calendar；重複匯入行為不視為 Apple 保證。

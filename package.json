@@ -1,0 +1,19 @@
+{
+  "name": "lightcal-ics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run generate:g0 && vite build",
+    "test": "node --test",
+    "generate:g0": "node scripts/generate-g0-fixture.js"
+  },
+  "dependencies": {
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "vite": "^8.2.2"
+  }
+}
