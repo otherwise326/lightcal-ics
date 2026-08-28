@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { buildMonthGrid, nextYearMonth, taipeiToday, yearMonthLabel } from './domain/month.js';
 import {
   assignmentsForExport,
@@ -20,6 +20,7 @@ import {
   renameCalendarProfile,
   savePreset as savePresetToWorkspace,
 } from './domain/workspace.js';
+import { registerPwa } from './pwa.js';
 
 const today = taipeiToday();
 const storage = createWorkspaceStorage(window.localStorage, { today });
@@ -30,6 +31,9 @@ const storageError = ref('');
 const formError = ref('');
 const exportError = ref('');
 const downloadMessage = ref('');
+const pwaUpdateAvailable = ref(false);
+const pwaUpdateError = ref('');
+let activatePwaUpdate = null;
 const newProfileName = ref('');
 const profileNameDraft = ref('');
 const presetEditor = reactive({ id: '', title: '', mode: 'none', time: '09:00' });
@@ -93,6 +97,28 @@ const overlapRecords = computed(() => exportRangeValid.value ? overlappingExport
   startDate: workspace.value.draft.exportStartDate,
   endDate: workspace.value.draft.exportEndDate,
 }, { today }) : []);
+
+onMounted(async () => {
+  try {
+    await registerPwa({
+      serviceWorker: navigator.serviceWorker,
+      windowObject: window,
+      baseUrl: import.meta.env.BASE_URL,
+      onUpdateReady(activateUpdate) {
+        activatePwaUpdate = activateUpdate;
+        pwaUpdateAvailable.value = true;
+      },
+    });
+  } catch {
+    pwaUpdateError.value = '離線啟動暫時無法準備；目前仍可在線使用與本機下載。';
+  }
+});
+
+function applyPwaUpdate() {
+  if (!activatePwaUpdate) return;
+  pwaUpdateAvailable.value = false;
+  activatePwaUpdate();
+}
 
 function reminderLabel(reminder) {
   if (reminder.mode === 'none') return '不提醒';
@@ -272,6 +298,11 @@ function clearWorkspace() {
 
 <template>
   <main class="app-shell">
+    <aside v-if="pwaUpdateAvailable" class="update-banner" role="status">
+      <span>LightCal 有新版本，草稿會保留在這台裝置。</span>
+      <button type="button" @click="applyPwaUpdate">重新載入更新</button>
+    </aside>
+    <p v-if="pwaUpdateError" class="error-message pwa-error" role="status">{{ pwaUpdateError }}</p>
     <header class="topbar">
       <div>
         <p class="brand-kicker">LightCal ICS</p>

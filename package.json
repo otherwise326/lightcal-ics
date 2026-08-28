@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate:g0 && vite build",
+    "build": "npm run generate:g0 && npm run generate:pwa-icons && vite build",
     "test": "node --test",
-    "generate:g0": "node scripts/generate-g0-fixture.js"
+    "generate:g0": "node scripts/generate-g0-fixture.js",
+    "generate:pwa-icons": "node scripts/generate-pwa-icons.js"
   },
   "dependencies": {
     "vue": "^3.5.42"

@@ -13,6 +13,9 @@
 }
 
 * { box-sizing: border-box; }
+.update-banner { position: sticky; top: .75rem; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 0 auto 1rem; padding: .8rem .9rem; border: 1px solid rgba(23, 107, 82, .24); border-radius: .9rem; background: #e8f4ee; box-shadow: 0 .5rem 1.4rem rgba(25, 67, 57, .14); color: #194339; font-size: .88rem; }
+.update-banner button { flex: 0 0 auto; border: 0; border-radius: 999px; padding: .55rem .75rem; background: #176b52; color: #fff; font: inherit; font-weight: 700; }
+.pwa-error { margin-bottom: 1rem; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select { font: inherit; }
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
