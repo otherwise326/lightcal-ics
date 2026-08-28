@@ -219,7 +219,7 @@ async function readGithubContent(github, target) {
   return { sha: validateGithubSha(current?.sha) };
 }
 
-function encodedPublicUrl(policy, path) {
+export function publicUrlForPath(policy, path) {
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   return `${policy.publicBaseUrl}/${encodedPath}`;
 }
@@ -270,7 +270,7 @@ export function createPublisher({ policy: policyInput, github }) {
         bytes: request.bytes,
         operation,
         sha: writtenSha,
-        publicUrl: encodedPublicUrl(policy, path),
+        publicUrl: publicUrlForPath(policy, path),
       });
     },
   });

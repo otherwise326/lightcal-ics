@@ -20,10 +20,17 @@ import {
   renameCalendarProfile,
   savePreset as savePresetToWorkspace,
 } from './domain/workspace.js';
+import {
+  createPublisherCredentialStorage,
+  normalizePublisherEndpoint,
+  publishIcs as publishIcsToServer,
+  waitForPublishedIcs,
+} from './domain/publisher-client.js';
 import { registerPwa } from './pwa.js';
 
 const today = taipeiToday();
 const storage = createWorkspaceStorage(window.localStorage, { today });
+const publisherCredentialStorage = createPublisherCredentialStorage(window.localStorage);
 const loaded = storage.load();
 const workspace = ref(loaded.workspace);
 const managementOpen = ref(false);
@@ -31,6 +38,19 @@ const storageError = ref('');
 const formError = ref('');
 const exportError = ref('');
 const downloadMessage = ref('');
+const publisherToken = ref(publisherCredentialStorage.load());
+const publisherTokenDraft = ref('');
+const publisherCredentialError = ref('');
+const publishBusy = ref(false);
+const publishError = ref('');
+const publishMessage = ref('');
+const publishedResult = ref(null);
+const publishedFingerprint = ref('');
+const publishedIcs = ref('');
+const publicationReady = ref(false);
+const publicationCheckBusy = ref(false);
+const publicationCheckError = ref('');
+let publicationCheckId = 0;
 const pwaUpdateAvailable = ref(false);
 const pwaUpdateError = ref('');
 let activatePwaUpdate = null;
@@ -41,6 +61,13 @@ const storageNotice = ref(({
   migrated: '已自動升級這台裝置上的舊版草稿。',
   recovered: '舊草稿無法讀取，原始內容已保留為 recovery copy，現在使用新的空白草稿。',
 })[loaded.source] ?? '');
+let publisherEndpoint = '';
+let publisherEndpointError = '';
+try {
+  publisherEndpoint = normalizePublisherEndpoint(import.meta.env.VITE_PUBLISHER_ENDPOINT ?? '');
+} catch {
+  publisherEndpointError = '發布服務網址設定無效；目前只能下載或分享。';
+}
 
 try { storage.save(workspace.value); } catch { storageError.value = '暫時無法儲存到這台裝置，請先不要關閉頁面。'; }
 
@@ -97,6 +124,21 @@ const overlapRecords = computed(() => exportRangeValid.value ? overlappingExport
   startDate: workspace.value.draft.exportStartDate,
   endDate: workspace.value.draft.exportEndDate,
 }, { today }) : []);
+const publisherConfigured = computed(() => Boolean(publisherEndpoint));
+const publisherCredentialConfigured = computed(() => Boolean(publisherToken.value));
+const exportFingerprint = computed(() => JSON.stringify({
+  profile: currentProfile.value,
+  assignments: exportAssignments.value,
+  startDate: workspace.value.draft.exportStartDate,
+  endDate: workspace.value.draft.exportEndDate,
+  filename: filenameModel.value,
+}));
+const publicationCurrent = computed(() => Boolean(publishedResult.value)
+  && publishedFingerprint.value === exportFingerprint.value);
+
+watch(exportFingerprint, (value) => {
+  if (publishedFingerprint.value && publishedFingerprint.value !== value) resetPublication();
+});
 
 onMounted(async () => {
   try {
@@ -140,6 +182,7 @@ function activateProfile(calendarProfileId) {
   resetPresetEditor();
   exportError.value = '';
   downloadMessage.value = '';
+  resetPublication();
 }
 
 function toggleDate(localDate) {
@@ -150,6 +193,7 @@ function toggleDate(localDate) {
     date: localDate,
   });
   downloadMessage.value = '';
+  resetPublication();
 }
 
 function openManagement() {
@@ -240,47 +284,211 @@ function resetFilename() {
   workspace.value.draft.filenameIsCustom = false;
 }
 
+function createCurrentExport() {
+  const generatedAt = new Date();
+  const result = buildScheduleExport({
+    calendarProfile: currentProfile.value,
+    assignments: workspace.value.assignments,
+    request: {
+      calendarProfileId: currentProfile.value.id,
+      startDate: workspace.value.draft.exportStartDate,
+      endDate: workspace.value.draft.exportEndDate,
+      filename: filenameModel.value,
+    },
+    generatedAt,
+  });
+  return { result, generatedAt };
+}
+
+function recordCurrentExport(result, generatedAt) {
+  workspace.value = recordExport(workspace.value, {
+    id: crypto.randomUUID(),
+    calendarProfileId: currentProfile.value.id,
+    startDate: workspace.value.draft.exportStartDate,
+    endDate: workspace.value.draft.exportEndDate,
+    filename: result.filename,
+    eventCount: result.events.length,
+    createdAt: generatedAt.toISOString(),
+  }, { today });
+}
+
+function triggerDownload(result) {
+  const url = URL.createObjectURL(new Blob([result.ics], { type: 'text/calendar;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = result.filename;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+function friendlyExportError(error) {
+  return ({
+    invalid_export_range: '請確認輸出開始日與結束日。',
+    export_events_required: '這個範圍內還沒有 assignment。',
+    assignment_preset_not_found: '有 assignment 對應不到常用項目，請重新選擇。',
+  })[error.message] ?? error.message;
+}
+
+function resetPublication() {
+  publicationCheckId += 1;
+  publishError.value = '';
+  publishMessage.value = '';
+  publishedResult.value = null;
+  publishedFingerprint.value = '';
+  publishedIcs.value = '';
+  publicationReady.value = false;
+  publicationCheckBusy.value = false;
+  publicationCheckError.value = '';
+}
+
 function downloadIcs() {
   exportError.value = '';
   downloadMessage.value = '';
   try {
-    const generatedAt = new Date();
-    const result = buildScheduleExport({
-      calendarProfile: currentProfile.value,
-      assignments: workspace.value.assignments,
-      request: {
-        calendarProfileId: currentProfile.value.id,
-        startDate: workspace.value.draft.exportStartDate,
-        endDate: workspace.value.draft.exportEndDate,
-        filename: filenameModel.value,
-      },
-      generatedAt,
-    });
-    const url = URL.createObjectURL(new Blob([result.ics], { type: 'text/calendar;charset=utf-8' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = result.filename;
-    link.hidden = true;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    workspace.value = recordExport(workspace.value, {
-      id: crypto.randomUUID(),
-      calendarProfileId: currentProfile.value.id,
-      startDate: workspace.value.draft.exportStartDate,
-      endDate: workspace.value.draft.exportEndDate,
-      filename: result.filename,
-      eventCount: result.events.length,
-      createdAt: generatedAt.toISOString(),
-    }, { today });
+    const { result, generatedAt } = createCurrentExport();
+    triggerDownload(result);
+    recordCurrentExport(result, generatedAt);
     downloadMessage.value = `已下載 ${result.filename}，共 ${result.events.length} 筆事件。`;
   } catch (error) {
-    exportError.value = ({
-      invalid_export_range: '請確認輸出開始日與結束日。',
-      export_events_required: '這個範圍內還沒有 assignment。',
-      assignment_preset_not_found: '有 assignment 對應不到常用項目，請重新選擇。',
-    })[error.message] ?? error.message;
+    exportError.value = friendlyExportError(error);
+  }
+}
+
+async function shareIcs() {
+  exportError.value = '';
+  downloadMessage.value = '';
+  try {
+    const { result, generatedAt } = createCurrentExport();
+    const file = new File([result.ics], result.filename, { type: 'text/calendar;charset=utf-8' });
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+      try {
+        await navigator.share({ title: result.filename, files: [file] });
+        recordCurrentExport(result, generatedAt);
+        downloadMessage.value = `已開啟分享選單：${result.filename}`;
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    triggerDownload(result);
+    recordCurrentExport(result, generatedAt);
+    downloadMessage.value = '這台裝置未完成檔案分享，已改為下載 .ics。';
+  } catch (error) {
+    exportError.value = friendlyExportError(error);
+  }
+}
+
+function savePublisherCredential() {
+  publisherCredentialError.value = '';
+  try {
+    publisherToken.value = publisherCredentialStorage.save(publisherTokenDraft.value);
+    publisherTokenDraft.value = '';
+  } catch {
+    publisherCredentialError.value = '憑證格式不正確；請貼上管理者提供的完整裝置憑證。';
+  }
+}
+
+function removePublisherCredential() {
+  if (!window.confirm('確定移除這台裝置的發布憑證？排班草稿與已發布的 .ics 不受影響。')) return;
+  publisherCredentialStorage.clear();
+  publisherToken.value = '';
+  publisherTokenDraft.value = '';
+  publisherCredentialError.value = '';
+  resetPublication();
+}
+
+function friendlyPublisherError(error) {
+  return ({
+    publisher_unauthorized: '發布憑證無效或已輪替，請重新設定。',
+    publisher_rate_limited: '發布太頻繁，請稍候一分鐘再試。',
+    publisher_write_conflict: '同一檔名正在被更新，請稍後再發布一次。',
+    publisher_upstream_unauthorized: '發布服務暫時無法寫入 GitHub，請管理者檢查 server credential。',
+    publisher_upstream_failed: 'GitHub 暫時無法完成發布，請稍後再試。',
+    publisher_request_too_large: '這份 .ics 太大，請縮小輸出日期範圍。',
+    publisher_response_invalid: '發布服務回應不完整，請先使用下載或分享。',
+  })[error.message] ?? '發布失敗；排班草稿仍在這台裝置，可先下載或分享 .ics。';
+}
+
+async function publishIcs() {
+  exportError.value = '';
+  publishError.value = '';
+  publishMessage.value = '';
+  downloadMessage.value = '';
+  if (!publisherConfigured.value) {
+    publishError.value = publisherEndpointError || '發布服務尚未完成設定；目前可先下載或分享。';
+    return;
+  }
+  if (!publisherCredentialConfigured.value) {
+    publishError.value = '請先到「管理」設定這台裝置的發布憑證。';
+    return;
+  }
+  publishBusy.value = true;
+  try {
+    const { result, generatedAt } = createCurrentExport();
+    const publication = await publishIcsToServer({
+      endpoint: publisherEndpoint,
+      token: publisherToken.value,
+      filename: result.filename,
+      ics: result.ics,
+    });
+    recordCurrentExport(result, generatedAt);
+    publishedResult.value = publication;
+    publishedFingerprint.value = exportFingerprint.value;
+    publishedIcs.value = result.ics;
+    publishMessage.value = publication.operation === 'created'
+      ? 'GitHub 已接收檔案，正在等待公開頁面就緒。'
+      : 'GitHub 已更新檔案，正在確認公開連結不是舊版本。';
+    void verifyPublishedIcs();
+  } catch (error) {
+    publishError.value = friendlyPublisherError(error);
+  } finally {
+    publishBusy.value = false;
+  }
+}
+
+async function verifyPublishedIcs() {
+  if (!publicationCurrent.value || !publishedIcs.value) return;
+  const checkId = ++publicationCheckId;
+  publicationReady.value = false;
+  publicationCheckBusy.value = true;
+  publicationCheckError.value = '';
+  try {
+    await waitForPublishedIcs({
+      endpoint: publisherEndpoint,
+      token: publisherToken.value,
+      filename: publishedResult.value.filename,
+      expectedIcs: publishedIcs.value,
+    });
+    if (checkId !== publicationCheckId) return;
+    publicationReady.value = true;
+    publishMessage.value = '公開檔已就緒，可以在 Safari 開啟並匯入。';
+  } catch {
+    if (checkId !== publicationCheckId) return;
+    publicationCheckError.value = 'GitHub Pages 尚未顯示這次內容；可稍後再檢查，或先下載／分享 .ics。';
+  } finally {
+    if (checkId === publicationCheckId) publicationCheckBusy.value = false;
+  }
+}
+
+async function copyPublicUrl() {
+  if (!publicationCurrent.value) return;
+  try {
+    await navigator.clipboard.writeText(publishedResult.value.publicUrl);
+    publishMessage.value = '公開連結已複製。';
+  } catch {
+    const field = document.createElement('textarea');
+    field.value = publishedResult.value.publicUrl;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand('copy');
+    field.remove();
+    publishMessage.value = copied ? '公開連結已複製。' : '無法自動複製，請長按下方連結。';
   }
 }
 
@@ -293,6 +501,7 @@ function clearWorkspace() {
   storageNotice.value = '已清除舊草稿並建立新的「我的班表」。';
   downloadMessage.value = '';
   exportError.value = '';
+  resetPublication();
 }
 </script>
 
@@ -374,6 +583,36 @@ function clearWorkspace() {
         </form>
       </div>
 
+      <div class="settings-block publisher-credential-block">
+        <div class="settings-title-row">
+          <h3>這台裝置的發布憑證</h3>
+          <span :class="publisherCredentialConfigured ? 'credential-ready' : 'credential-missing'">
+            {{ publisherCredentialConfigured ? '已設定' : '未設定' }}
+          </span>
+        </div>
+        <p class="credential-copy">憑證只保存在這個 PWA 的本機 storage，不會放進 .ics 或 GitHub。移除後仍可下載與分享。</p>
+        <form v-if="!publisherCredentialConfigured" class="credential-form" @submit.prevent="savePublisherCredential">
+          <input class="visually-hidden" type="text" name="username" value="lightcal-publisher" autocomplete="username" tabindex="-1" aria-hidden="true">
+          <label class="grow-field">裝置憑證
+            <input
+              v-model="publisherTokenDraft"
+              type="password"
+              minlength="43"
+              maxlength="128"
+              autocomplete="new-password"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="貼上管理者提供的憑證"
+            >
+          </label>
+          <button class="secondary-button" type="submit">儲存到這台裝置</button>
+        </form>
+        <button v-else class="danger-button remove-credential-button" type="button" @click="removePublisherCredential">移除發布憑證</button>
+        <p v-if="publisherCredentialError" class="error-message">{{ publisherCredentialError }}</p>
+        <p v-if="publisherEndpointError" class="error-message">{{ publisherEndpointError }}</p>
+        <p v-else-if="!publisherConfigured" class="empty-copy">正式 publisher endpoint 尚未寫入 build；目前仍可離線排班與產檔。</p>
+      </div>
+
       <p v-if="formError" class="error-message">{{ formError }}</p>
       <div class="danger-zone">
         <div><strong>清除本機草稿</strong><small>會清除設定、assignment 與輸出紀錄，不影響 Apple Calendar。</small></div>
@@ -440,7 +679,7 @@ function clearWorkspace() {
 
     <section class="export-section" aria-labelledby="export-heading">
       <div class="section-heading export-heading">
-        <div><span class="step-number">3</span><h2 id="export-heading">確認範圍並下載</h2></div>
+        <div><span class="step-number">3</span><h2 id="export-heading">確認範圍並發布</h2></div>
         <strong>{{ exportAssignments.length }} 筆事件</strong>
       </div>
       <div class="export-fields">
@@ -458,11 +697,36 @@ function clearWorkspace() {
       </div>
       <p v-if="!exportRangeValid" class="error-message">結束日不能早於開始日。</p>
       <p v-else-if="!exportAssignments.length" class="empty-copy">這個範圍內還沒有 assignment。</p>
-      <p v-if="overlapRecords.length" class="overlap-warning">這個日期範圍與 {{ overlapRecords.length }} 次先前輸出重疊。Apple 不保證重複匯入會自動去重，請確認後再下載。</p>
+      <p v-if="overlapRecords.length" class="overlap-warning">這個日期範圍與 {{ overlapRecords.length }} 次先前輸出重疊。Apple 不保證重複匯入會自動去重，請確認後再發布或下載。</p>
       <p v-if="exportError" class="error-message">{{ exportError }}</p>
+      <p v-if="publishError" class="error-message">{{ publishError }}</p>
+      <p v-if="publishMessage" class="success-message">{{ publishMessage }}</p>
+      <p v-if="publicationCheckError" class="overlap-warning">{{ publicationCheckError }}</p>
       <p v-if="downloadMessage" class="success-message">{{ downloadMessage }}</p>
-      <button class="primary-button download-button" type="button" :disabled="!exportRangeValid || !exportAssignments.length" @click="downloadIcs">下載 .ics</button>
-      <p class="apple-boundary">下載後由你選擇要匯入的 Apple Calendar；本工具不會讀回、覆寫或同步已匯入事件。</p>
+      <button
+        class="primary-button publish-button"
+        type="button"
+        :disabled="!exportRangeValid || !exportAssignments.length || publishBusy"
+        @click="publishIcs"
+      >
+        {{ publishBusy ? '正在安全發布…' : '發布並取得公開連結' }}
+      </button>
+      <button v-if="!publisherCredentialConfigured" class="credential-shortcut" type="button" @click="openManagement">先設定這台裝置的發布憑證</button>
+
+      <div v-if="publicationCurrent" class="published-card" aria-live="polite">
+        <span class="section-label">公開連結 · {{ publicationReady ? '已就緒' : publicationCheckBusy ? '檢查中' : '待確認' }}</span>
+        <a class="public-url" :href="publishedResult.publicUrl" target="_blank" rel="noopener noreferrer">{{ publishedResult.publicUrl }}</a>
+        <a v-if="publicationReady" class="safari-button" :href="publishedResult.publicUrl" target="_blank" rel="noopener noreferrer">在 Safari 開啟並匯入</a>
+        <button v-else class="safari-button safari-button-pending" type="button" disabled>{{ publicationCheckBusy ? '等待 GitHub Pages…' : '公開檔尚未就緒' }}</button>
+        <button class="secondary-button" type="button" @click="copyPublicUrl">複製公開連結</button>
+        <button v-if="publicationCheckError" class="secondary-button retry-publication-button" type="button" @click="verifyPublishedIcs">再檢查一次</button>
+      </div>
+
+      <div class="fallback-actions">
+        <button class="secondary-button" type="button" :disabled="!exportRangeValid || !exportAssignments.length" @click="downloadIcs">下載 .ics</button>
+        <button class="secondary-button" type="button" :disabled="!exportRangeValid || !exportAssignments.length" @click="shareIcs">分享 .ics</button>
+      </div>
+      <p class="apple-boundary">公開連結由 Safari 開啟後，再由你選擇要匯入的 Apple Calendar；本工具不會讀回、覆寫或同步已匯入事件。</p>
     </section>
   </main>
 </template>

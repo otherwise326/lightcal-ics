@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run generate:g0 && npm run generate:pwa-icons && vite build",
+    "deploy:pages": "npm run build && wrangler pages deploy dist --project-name lightcal-ics --branch main",
+    "deploy:worker": "wrangler deploy",
     "test": "node --test",
     "generate:g0": "node scripts/generate-g0-fixture.js",
     "generate:pwa-icons": "node scripts/generate-pwa-icons.js"
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "wrangler": "^4.127.0"
   }
 }

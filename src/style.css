@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; clip-path: inset(50%) !important; }
 .update-banner { position: sticky; top: .75rem; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 0 auto 1rem; padding: .8rem .9rem; border: 1px solid rgba(23, 107, 82, .24); border-radius: .9rem; background: #e8f4ee; box-shadow: 0 .5rem 1.4rem rgba(25, 67, 57, .14); color: #194339; font-size: .88rem; }
 .update-banner button { flex: 0 0 auto; border: 0; border-radius: 999px; padding: .55rem .75rem; background: #176b52; color: #fff; font: inherit; font-weight: 700; }
 .pwa-error { margin-bottom: 1rem; }
@@ -49,6 +50,14 @@ h2, h3, p { margin-top: 0; }
 .icon-close { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 12px; background: #e7eeea; color: var(--ink); font-size: 1.45rem; }
 .settings-block { margin-top: 16px; border-top: 1px solid #dce5df; padding-top: 16px; }
 .settings-block h3 { margin-bottom: 11px; font-size: .88rem; }
+.publisher-credential-block .settings-title-row { align-items: center; }
+.publisher-credential-block .settings-title-row h3 { margin-bottom: 0; }
+.credential-copy { margin: 9px 0 12px; color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.credential-form { display: flex; align-items: end; gap: 10px; }
+.credential-ready, .credential-missing { border-radius: 999px; padding: 5px 8px; font-size: .68rem; font-weight: 900; }
+.credential-ready { background: #e1f3e8; color: #286041; }
+.credential-missing { background: #f3eee2; color: #705718; }
+.remove-credential-button { width: 100%; }
 .settings-title-row { margin-bottom: 10px; }
 .settings-title-row h3 { margin-bottom: 0; }
 .settings-title-row span { color: var(--muted); font-size: .72rem; font-weight: 800; }
@@ -117,7 +126,16 @@ h2, h3, p { margin-top: 0; }
 .export-summary strong { overflow: hidden; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .primary-button { min-height: 44px; border: 0; border-radius: 13px; padding: 10px 15px; background: var(--mint-strong); color: white; font-weight: 900; }
 .primary-button:disabled { opacity: .45; }
-.download-button { width: 100%; margin-top: 13px; }
+.publish-button { width: 100%; margin-top: 13px; }
+.credential-shortcut { width: 100%; margin-top: 8px; border: 0; padding: 8px; background: transparent; color: var(--mint-strong); font-size: .74rem; font-weight: 850; }
+.published-card { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 12px; border: 1px solid #b8d8c8; border-radius: 15px; padding: 13px; background: #f0faf4; }
+.published-card .section-label, .published-card .public-url { grid-column: 1 / -1; }
+.public-url { overflow: hidden; color: #235d4c; font-size: .72rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.safari-button { display: grid; place-items: center; min-height: 42px; border-radius: 11px; padding: 8px 12px; background: #176b52; color: white; font-size: .78rem; font-weight: 900; text-align: center; text-decoration: none; }
+.safari-button-pending { border: 0; opacity: .52; }
+.retry-publication-button { grid-column: 1 / -1; }
+.fallback-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+.fallback-actions .secondary-button:disabled { cursor: default; opacity: .45; }
 .apple-boundary { margin: 9px 1px 0; color: var(--muted); font-size: .68rem; line-height: 1.45; }
 
 @media (max-width: 520px) {
@@ -128,11 +146,13 @@ h2, h3, p { margin-top: 0; }
   .selection-note { display: none; }
   .date-cell { min-height: 59px; padding-inline: 3px; }
   .management-panel, .export-section { padding: 15px 12px; }
-  .inline-form, .filename-row { align-items: stretch; flex-direction: column; }
+  .inline-form, .filename-row, .credential-form { align-items: stretch; flex-direction: column; }
   .preset-editor-item { align-items: stretch; flex-direction: column; }
   .compact-actions { display: grid; grid-template-columns: 36px 36px 1fr 1fr; }
   .preset-form { grid-template-columns: 1fr 1fr; }
   .preset-form label:first-child { grid-column: 1 / -1; }
   .export-summary { gap: 5px; }
   .secondary-button { width: 100%; }
+  .published-card { grid-template-columns: 1fr; }
+  .published-card .section-label, .published-card .public-url { grid-column: auto; }
 }
