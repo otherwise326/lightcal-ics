@@ -12,19 +12,9 @@
 
 `/Users/vidan/Documents/Codex/2026-08-21/lightcal-html-css-vanilla-js-vue/`
 
-G0 三事件 `.ics` 與 Apple Calendar 實機 Gate 已通過。當前 Gate 與完成狀態只以 Obsidian `STATUS.md` 為準。
+G0 Apple Calendar 實機 Gate、G1 純 domain／ICS 契約與 G2 iPhone-first 本機排班流程皆已通過。當前 Gate、完成狀態與禁止提前實作的範圍只以 Obsidian `STATUS.md` 為準。
 
-G1 嚴格範圍：
-
-- 定義 calendar profile、全天 preset、reminder、assignment 與 export request 的 versioned schema。
-- 支援同一天多個不同事件、同 preset／日期 toggle、跨月 assignment 與 inclusive 輸出範圍。
-- 班表一律輸出全天 `VALUE=DATE`；提醒為不提醒、當天 `HH:mm` 或前一天 `HH:mm`，轉成 absolute `VALARM`。
-- 預設檔名為 `行事曆名_YYYYMMDD-YYYYMMDD.ics` 且可安全修改。
-- 先寫純模組與 tests；不要提前做 UI、PWA、publisher、GitHub remote／Pages、token、Cloudflare 或外部部署。
-
-G1 完成條件以 Obsidian `STATUS.md` 為準；完成後更新 STATUS、提交 Git，再停止本 session。
-
-## G0 本機操作
+## 本機操作
 
 ```bash
 npm install
@@ -35,4 +25,5 @@ npm run dev
 
 - `src/domain/ics.js` 是不依賴 UI 的純 ICS generator。
 - `npm run generate:g0` 會產生 `public/lightcal-ics-g0-three-events.ics`。
+- 排班草稿只存在目前裝置的 versioned local storage；匯入後仍以 Apple Calendar 為唯一 source of truth。
 - 測試檔只應匯入專用測試 calendar；重複匯入行為不視為 Apple 保證。
