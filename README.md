@@ -12,7 +12,7 @@
 
 `/Users/vidan/Documents/Codex/2026-08-21/lightcal-html-css-vanilla-js-vue/`
 
-G0 Apple Calendar 實機 Gate、G1 純 domain／ICS 契約與 G2 iPhone-first 本機排班流程皆已通過。當前 Gate、完成狀態與禁止提前實作的範圍只以 Obsidian `STATUS.md` 為準。
+G0 Apple Calendar 實機 Gate、G1 純 domain／ICS 契約、G2 iPhone-first 本機排班流程、G3 離線 PWA app shell 與 G4 本機 publisher 契約皆已通過。當前 Gate、完成狀態與禁止提前實作的範圍只以 Obsidian `STATUS.md` 為準。
 
 ## 本機操作
 
@@ -24,6 +24,7 @@ npm run dev
 ```
 
 - `src/domain/ics.js` 是不依賴 UI 的純 ICS generator。
+- `publisher/index.js` 是不依賴 HTTP runtime 的 G4 publisher core；契約與外部邊界見 `publisher/README.md`。
 - `npm run generate:g0` 會產生 `public/lightcal-ics-g0-three-events.ics`。
 - 排班草稿只存在目前裝置的 versioned local storage；匯入後仍以 Apple Calendar 為唯一 source of truth。
 - 測試檔只應匯入專用測試 calendar；重複匯入行為不視為 Apple 保證。
